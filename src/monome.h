@@ -3,6 +3,7 @@
 
 #include "events.h"
 #include "ftdi.h"
+#include "cdc.h"
 #include "types.h"
 
 //--------------------------------
@@ -110,6 +111,8 @@ extern refresh_t monome_refresh;
 extern void init_monome(void);
 // check monome device  from FTDI string descriptors
 extern u8 check_monome_device_desc(char* mstr, char* pstr, char* sstr);
+// manually check for available transports and switch if needed
+extern void monome_check_transport(void);
 
 // check dirty flags and refresh leds
 extern void monome_grid_refresh(void);

@@ -4,6 +4,7 @@
 
 #include "events.h"
 #include "ftdi.h"
+#include "cdc.h"
 #include "monome.h"
 
 
@@ -44,6 +45,34 @@ typedef struct e_monomeDesc {
   u8 vari; // is variable brightness, true/false
 } monomeDesc;
 
+//------ transport abstraction types
+
+// transport type enumeration
+typedef enum {
+  eTransportFTDI,
+  eTransportCDC,
+  eTransportNumTransports
+} eMonomeTransport;
+
+// transport function pointer types
+typedef u8 (*transport_connected_t)(void);
+typedef u8 (*transport_write_t)(u8* data, u8 bytes);
+typedef void (*transport_read_t)(void);
+typedef u8 (*transport_tx_busy_t)(void);
+typedef u8 (*transport_rx_busy_t)(void);
+typedef u8 (*transport_rx_bytes_t)(void);
+typedef u8* (*transport_rx_buf_t)(void);
+
+// transport function pointer table
+typedef struct {
+  transport_connected_t connected;
+  transport_write_t write;
+  transport_read_t read;
+  transport_tx_busy_t tx_busy;
+  transport_rx_busy_t rx_busy;
+  transport_rx_bytes_t rx_bytes;
+  transport_rx_buf_t rx_buf;
+} monome_transport_t;
 
 //// dummy functions
 static void read_serial_dummy(void) { return; }
@@ -89,6 +118,31 @@ static event_t ev;
 // local tx buffer
 static u8 txBuf[MONOME_TX_BUF_LEN];
 
+// current transport type and functions
+static eMonomeTransport currentTransport;
+static monome_transport_t* transport;
+
+// transport function tables
+static monome_transport_t ftdi_transport = {
+  .connected = ftdi_connected,
+  .write = ftdi_write,
+  .read = ftdi_read,
+  .tx_busy = ftdi_tx_busy,
+  .rx_busy = ftdi_rx_busy,
+  .rx_bytes = ftdi_rx_bytes,
+  .rx_buf = ftdi_rx_buf
+};
+
+static monome_transport_t cdc_transport = {
+  .connected = cdc_connected,
+  .write = cdc_write,
+  .read = cdc_read,
+  .tx_busy = cdc_tx_busy,
+  .rx_busy = cdc_rx_busy,
+  .rx_bytes = cdc_rx_bytes,
+  .rx_buf = cdc_rx_buf
+};
+
 //---------------------------------------------
 //------ static function declarations
 
@@ -132,8 +186,9 @@ static inline void monome_grid_adc_write_event( u8 n, u16 val);
 static inline void monome_ring_enc_write_event( u8 n, u8 val);
 static inline void monome_ring_key_write_event( u8 n, u8 val);
 
-
-
+// transport management
+static void set_transport(eMonomeTransport transport_type);
+static eMonomeTransport detect_transport(void);
 
 //---------------------------------
 //----- static variables
@@ -197,6 +252,10 @@ void init_monome(void) {
   for(i=0; i<MONOME_MAX_LED_BYTES; i++) {
     monomeLedBuffer[i] = 0;
   }
+  
+  // Initialize transport to FTDI by default
+  set_transport(eTransportFTDI);
+  
   //  print_dbg("\r\n finished monome class init");
 }
 
@@ -206,6 +265,10 @@ u8 check_monome_device_desc(char* mstr, char* pstr, char* sstr) {
   u8 matchMan = 0;
   u8 i;
   u8 ret;
+  
+  // Detect and set the appropriate transport
+  eMonomeTransport detectedTransport = detect_transport();
+  set_transport(detectedTransport);
   //-- source strings are unicode so we need to look at every other byte
   // manufacturer
   for(i=0; i<MONOME_MANSTR_LEN; i++) {
@@ -270,14 +333,22 @@ u8 check_monome_device_desc(char* mstr, char* pstr, char* sstr) {
   return 0;
 }
 
+// manually check for available transports and switch if needed
+void monome_check_transport(void) {
+  eMonomeTransport detectedTransport = detect_transport();
+  if (detectedTransport != currentTransport) {
+    set_transport(detectedTransport);
+  }
+}
+
 // check dirty flags and refresh leds
 void monome_grid_refresh(void) {
   // may need to wait after each quad until tx transfer is complete
-  u8 busy = ftdi_tx_busy();
+  u8 busy = transport->tx_busy();
 
   // check quad 0
   if( monomeFrameDirty & 0b0001 ) {
-    while( busy ) { busy = ftdi_tx_busy(); }
+    while( busy ) { busy = transport->tx_busy(); }
     (*monome_grid_map)(0, 0, monomeLedBuffer);
     monomeFrameDirty &= 0b1110;
     busy = 1;
@@ -285,7 +356,7 @@ void monome_grid_refresh(void) {
   // check quad 1
   if( monomeFrameDirty & 0b0010 ) {
     if ( mdesc.cols > 7 ) {
-      while( busy ) { busy = ftdi_tx_busy(); }
+      while( busy ) { busy = transport->tx_busy(); }
       (*monome_grid_map)(8, 0, monomeLedBuffer + 8);
       monomeFrameDirty &= 0b1101;
       busy = 1;
@@ -294,7 +365,7 @@ void monome_grid_refresh(void) {
   // check quad 2
   if( monomeFrameDirty &  0b0100 ) {
     if( mdesc.rows > 7 ) {
-      while( busy ) { busy = ftdi_tx_busy(); }
+      while( busy ) { busy = transport->tx_busy(); }
       (*monome_grid_map)(0, 8, monomeLedBuffer + 128);
       monomeFrameDirty &= 0b1011;
       busy = 1;
@@ -303,33 +374,33 @@ void monome_grid_refresh(void) {
   // check quad 3
   if( monomeFrameDirty & 0b1000 ) {
     if( (mdesc.rows > 7) && (mdesc.cols > 7) )  {
-      while( busy ) { busy = ftdi_tx_busy(); }
+      while( busy ) { busy = transport->tx_busy(); }
       (*monome_grid_map)(8, 8, monomeLedBuffer + 136);
       monomeFrameDirty &= 0b0111;
       busy = 1;
     }
   }
-  while( busy ) { busy = ftdi_tx_busy(); }
+  while( busy ) { busy = transport->tx_busy(); }
 }
 
 
 // check flags and refresh arc
 void monome_arc_refresh(void) {
   // may need to wait after each quad until tx transfer is complete
-  u8 busy = ftdi_tx_busy();
+  u8 busy = transport->tx_busy();
   u8 i;
 
   for(i=0;i<mdesc.encs;i++) {
     if(monomeFrameDirty & (1<<i)) {
       // if(i==1) print_dbg("\r\nsecond");
-      while(busy) { busy = ftdi_tx_busy(); }
+      while(busy) { busy = transport->tx_busy(); }
       (*monome_ring_map)(i, monomeLedBuffer + (i<<6));
       monomeFrameDirty &= ~(1<<i);
       busy = 1;
     }
   }
 
-  while( busy ) { busy = ftdi_tx_busy(); }
+  while( busy ) { busy = transport->tx_busy(); }
 }
 
 
@@ -487,6 +558,37 @@ static inline void set_funcs(void) {
   monome_refresh = refreshFuncs[mdesc.device == eDeviceArc];   // toggle on grid vs arc
 }
 
+// set transport functions
+static void set_transport(eMonomeTransport transport_type) {
+  currentTransport = transport_type;
+  switch(transport_type) {
+    case eTransportFTDI:
+      transport = &ftdi_transport;
+      break;
+    case eTransportCDC:
+      transport = &cdc_transport;
+      break;
+    default:
+      transport = &ftdi_transport; // fallback to FTDI
+      currentTransport = eTransportFTDI;
+      break;
+  }
+}
+
+// detect available transport type
+static eMonomeTransport detect_transport(void) {
+  // Check CDC first (prefer modern devices)
+  if (cdc_connected()) {
+    return eTransportCDC;
+  }
+  // Check FTDI for legacy devices
+  if (ftdi_connected()) {
+    return eTransportFTDI;
+  }
+  // Default to FTDI if nothing detected
+  return eTransportFTDI;
+}
+
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 ///// protocol - specific functions
@@ -536,40 +638,40 @@ static u8 setup_mext(void) {
 
   // clear out rxbuf
   rxBytes = 1;
-  while(rxBytes != 0 && ftdi_connected()) {
-    ftdi_read();
+  while(rxBytes != 0 && transport->connected()) {
+    transport->read();
 
     delay_us(500);
     busy = 1;
 
     while(busy)
-      busy = ftdi_rx_busy();
+      busy = transport->rx_busy();
 
-    rxBytes = ftdi_rx_bytes();
+    rxBytes = transport->rx_bytes();
   }
 
   rxBytes = 0;
 
-  while(rxBytes != 6 && ftdi_connected()) {
+  while(rxBytes != 6 && transport->connected()) {
     // FIXME: fuck these delays
-    ftdi_write(&w, 1);	// query
+    transport->write(&w, 1);	// query
 
     delay_us(500);
-    ftdi_read();
+    transport->read();
 
     delay_us(500);
     busy = 1;
 
     while(busy)
-      busy = ftdi_rx_busy();
+      busy = transport->rx_busy();
 
-    rxBytes = ftdi_rx_bytes();
+    rxBytes = transport->rx_bytes();
 
     if(rxBytes != 6 ){
       print_dbg("e");
   /*
       print_dbg("\r\n got unexpected byte count in response to mext setup request; \r\n");
-      prx = ftdi_rx_buf();
+      prx = transport->rx_buf();
 
       for(;rxBytes != 0; rxBytes--) {
         print_dbg_ulong(*(++prx));
@@ -581,7 +683,7 @@ static u8 setup_mext(void) {
     }
   }
 
-  prx = ftdi_rx_buf();
+  prx = transport->rx_buf();
   prx++; // 1st returned byte is 0
   if(*prx == 1) {
     mdesc.device = eDeviceGrid;
@@ -621,16 +723,16 @@ static u8 setup_mext(void) {
   // get id
   w = 1;
   delay_ms(1);
-  ftdi_write(&w, 1);
+  transport->write(&w, 1);
   delay_ms(1);
-  ftdi_read();
+  transport->read();
   delay_ms(1);
   busy = 1;
   while(busy) {
-    busy = ftdi_rx_busy();
+    busy = transport->rx_busy();
   }
-  rxBytes = ftdi_rx_bytes();
-  prx = ftdi_rx_buf();
+  rxBytes = transport->rx_bytes();
+  prx = transport->rx_buf();
   if(*(prx+2) == 'k')
       mdesc.vari = 0;
   // print_dbg("\r\ndone waiting. bytes read: ");
@@ -661,9 +763,9 @@ static u8 setup_mext(void) {
 /// (e.g. from usb transfer callback )
 
 static void read_serial_40h(void) {
-  u8* prx = ftdi_rx_buf();
+  u8* prx = transport->rx_buf();
   u8 i;
-  rxBytes = ftdi_rx_bytes();
+  rxBytes = transport->rx_bytes();
   // print_dbg("\r\n read_serial_40h, byte count: ");
   // print_dbg_ulong(rxBytes);
   // print_dbg(" ; data : [ 0x");
@@ -696,9 +798,9 @@ static void read_serial_40h(void) {
 }
 
 static void read_serial_series(void) {
-  u8* prx = ftdi_rx_buf();
+  u8* prx = transport->rx_buf();
   u8 i;
-  rxBytes = ftdi_rx_bytes();
+  rxBytes = transport->rx_bytes();
   // print_dbg("\r\n read_serial_series, byte count: ");
   // print_dbg_ulong(rxBytes);
   // print_dbg(" ; data : [ 0x");
@@ -733,10 +835,10 @@ static void read_serial_mext(void) {
   static u8* prx; // pointer to rx buf
   static u8 com;
 
-  rxBytes = ftdi_rx_bytes();
+  rxBytes = transport->rx_bytes();
   if( rxBytes ) {
     nbp = 0;
-    prx = ftdi_rx_buf();
+    prx = transport->rx_buf();
     while(nbp < rxBytes) {
       com = (u8)(*(prx++));
       nbp++;
@@ -827,7 +929,7 @@ static void grid_map_mext( u8 x, u8 y, const u8* data ) {
     data += MONOME_QUAD_LEDS; // skip the rest of the row to get back in target quad
     // ptx++;
   }
-  ftdi_write(txBuf, 32 + 3);
+  transport->write(txBuf, 32 + 3);
 }
 
 
@@ -859,7 +961,7 @@ static void grid_map_40h(u8 x, u8 y, const u8* data) {
     // print_dbg(" row data: 0x");
     // print_dbg_hex(txBuf[(i*2) + 1]);
   }
-  ftdi_write(txBuf, 16);
+  transport->write(txBuf, 16);
 }
 
 static void grid_map_series(u8 x, u8 y, const u8* data) {
@@ -890,7 +992,7 @@ static void grid_map_series(u8 x, u8 y, const u8* data) {
     data += MONOME_QUAD_LEDS; // skip the rest of the row to get back in target quad
     ++ptx;
   }
-  ftdi_write(txBuf, MONOME_QUAD_LEDS + 1);
+  transport->write(txBuf, MONOME_QUAD_LEDS + 1);
 }
 
 /* static void grid_map_level_mext(u8 x, u8 y, const u8* data) { */
@@ -916,7 +1018,7 @@ static void ring_map_mext(u8 n, u8* data) {
     ptx++;
   }
 
-  ftdi_write(txBuf, 32 + 2);
+  transport->write(txBuf, 32 + 2);
 }
 
 static void set_intense_series(u8 v) {
@@ -930,7 +1032,7 @@ encode:		byte 0 = ((id) << 4) | b = 160 + b
 */
   txBuf[0] = 0xa0;
   txBuf[0] |= (v & 0x0f);
-  ftdi_write(txBuf, 1);
+  transport->write(txBuf, 1);
 }
 
 static void set_intense_mext(u8 v) {
