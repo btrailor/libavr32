@@ -18,6 +18,9 @@ typedef enum {
   /// connect/disconnect FTDI-based devices
   kEventFtdiConnect,
   kEventFtdiDisconnect,
+  /// connect/disconnect CDC-based devices
+  kEventCdcConnect,
+  kEventCdcDisconnect,
   /// monome protocol
   kEventMonomeConnect,
   kEventMonomeDisconnect,
