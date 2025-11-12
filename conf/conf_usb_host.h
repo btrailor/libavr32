@@ -13,7 +13,7 @@
 
 //! Array of UHI APIs Define the list of UHI supported by USB host.
 // #define USB_HOST_UHI        UHI_FTDI , UHI_HID
-#define USB_HOST_UHI        UHI_FTDI, UHI_HID, UHI_MSC, UHI_MIDI
+#define USB_HOST_UHI        UHI_FTDI, UHI_CDC, UHI_HID, UHI_MSC, UHI_MIDI
 
 //! Maximum current allowed on Vbus (mA)
 #define USB_HOST_POWER_MAX  500
