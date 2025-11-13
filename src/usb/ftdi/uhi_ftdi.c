@@ -82,7 +82,7 @@ uhc_enum_status_t uhi_ftdi_install(uhc_device_t* dev) {
   uint16_t conf_desc_lgt, vid, pid;
   usb_iface_desc_t *ptr_iface;
 
-  // print_dbg("\r\n run uhi_ftdi_install");
+  print_dbg("\r\n FTDI: uhi_ftdi_install() called");
 
   if (uhi_ftdi_dev.dev != NULL) {
     return UHC_ENUM_SOFTWARE_LIMIT; // Device already allocated
@@ -93,8 +93,10 @@ uhc_enum_status_t uhi_ftdi_install(uhc_device_t* dev) {
   pid = le16_to_cpu(dev->dev_desc.idProduct);
 
   if( (vid == FTDI_VID) && (pid == FTDI_PID) ) {
+    print_dbg("\r\n FTDI: VID/PID matched, proceeding");
     ;; // this is an FTDI device, so continue
   } else {
+    print_dbg("\r\n FTDI: VID/PID not matched, rejecting");
     return UHC_ENUM_UNSUPPORTED;
   }
 
