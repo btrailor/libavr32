@@ -102,6 +102,7 @@ void cdc_setup(void) {
   char * manstr;
   char * prodstr;
   char * serstr;
+  u8 result;
   
   print_dbg("\r\n CDC setup routine");
   // set connection flag
@@ -110,8 +111,17 @@ void cdc_setup(void) {
   // get string data...
   uhi_cdc_get_strings(&manstr, &prodstr, &serstr);
   
+  print_dbg("\r\n CDC strings: man=");
+  print_dbg(manstr);
+  print_dbg(" prod=");
+  print_dbg(prodstr);
+  print_dbg(" ser=");
+  print_dbg(serstr);
+  
   //// query if this is a monome device
-  check_monome_device_desc(manstr, prodstr, serstr);
+  result = check_monome_device_desc(manstr, prodstr, serstr);
+  print_dbg("\r\n CDC device check result: ");
+  print_dbg_hex(result);
 }
 
 // rx buffer
