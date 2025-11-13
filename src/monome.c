@@ -599,13 +599,16 @@ static void set_transport(eMonomeTransport transport_type) {
 static eMonomeTransport detect_transport(void) {
   // Check CDC first (prefer modern devices)
   if (cdc_connected()) {
+    print_dbg("\r\n detect_transport: CDC connected");
     return eTransportCDC;
   }
   // Check FTDI for legacy devices
   if (ftdi_connected()) {
+    print_dbg("\r\n detect_transport: FTDI connected");
     return eTransportFTDI;
   }
   // Default to FTDI if nothing detected
+  print_dbg("\r\n detect_transport: nothing detected, defaulting to FTDI");
   return eTransportFTDI;
 }
 
