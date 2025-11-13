@@ -165,12 +165,19 @@ uhc_enum_status_t uhi_cdc_install(uhc_device_t* dev) {
     ptr_iface = (usb_iface_desc_t*)((uint8_t*)ptr_iface + ptr_iface->bLength);
   }
 
+  print_dbg("\r\n CDC: checking device compatibility:");
+  print_dbg("\r\n   comm_supported="); print_dbg_hex(b_iface_comm_supported);
+  print_dbg(" data_supported="); print_dbg_hex(b_iface_data_supported);
+  print_dbg(" ep_in="); print_dbg_hex(uhi_cdc_dev.ep_in);
+  print_dbg(" ep_out="); print_dbg_hex(uhi_cdc_dev.ep_out);
+
   if (b_iface_comm_supported && b_iface_data_supported && 
       uhi_cdc_dev.ep_in && uhi_cdc_dev.ep_out) {
     uhi_cdc_dev.dev = dev;
-    print_dbg("\r\n completed CDC device install");
+    print_dbg("\r\n CDC: device install SUCCESS");
     return UHC_ENUM_SUCCESS;
   }
+  print_dbg("\r\n CDC: device install FAILED - missing required interfaces or endpoints");
   return UHC_ENUM_UNSUPPORTED; // No interface supported
 }
 
