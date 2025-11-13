@@ -276,16 +276,18 @@ u8 check_monome_device_desc(char* mstr, char* pstr, char* sstr) {
   }
   buf[i] = 0;
   matchMan = ( strncmp(buf, "monome", MONOME_MANSTR_LEN) == 0 );
-  /* print_dbg("\r\n manstring: "); */
-  /* print_dbg(buf); */
+  print_dbg("\r\n check_monome: processed manstring: ");
+  print_dbg(buf);
+  print_dbg(" matchMan=");
+  print_dbg_hex(matchMan);
 
   // serial number string
   for(i=0; i<MONOME_SERSTR_LEN; i++) {
     buf[i] = sstr[i*2];
   }
   buf[i] = 0;
-  /* print_dbg("\r\n serial string: "); */
-  /* print_dbg(buf); */
+  print_dbg("\r\n check_monome: processed serial string: ");
+  print_dbg(buf);
   if(matchMan == 0) {
     // didn't match the manufacturer string, but check the serial for DIYs
     if( strncmp(buf, "a40h", 4) == 0) {
