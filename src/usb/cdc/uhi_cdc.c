@@ -95,9 +95,15 @@ uhc_enum_status_t uhi_cdc_install(uhc_device_t* dev) {
   pid = le16_to_cpu(dev->dev_desc.idProduct);
 
   // Check if this is a monome device by VID
-  if(vid != 0x16c0) {  // Monome VID
+  // Accept both original monome VID (0x16c0) and STM32 VID (0x0483) for 2021+ grids
+  if(vid != 0x16c0 && vid != 0x0483) {
+    print_dbg("\r\n CDC: unsupported VID, rejecting");
     return UHC_ENUM_UNSUPPORTED;
   }
+  
+  print_dbg("\r\n CDC: VID accepted (");
+  print_dbg_hex(vid);
+  print_dbg("), proceeding with enumeration");
 
   conf_desc_lgt = le16_to_cpu(dev->conf_desc->wTotalLength);
   ptr_iface = (usb_iface_desc_t*)dev->conf_desc;
