@@ -50,11 +50,14 @@ static void ftdi_rx_done(usb_add_t add,
   /* else */
 
   if (rxBytes) {
-    // check for monome events
-    //    if(monome_read_serial != NULL) {
-    (*monome_read_serial)();
-    //}
-    ///... TODO: other protocols
+    // Only process if FTDI is connected
+    if (ftdiConnect) {
+      // check for monome events
+      //    if(monome_read_serial != NULL) {
+      (*monome_read_serial)();
+      //}
+      ///... TODO: other protocols
+    }
   }
 
   rxBusy = false;
