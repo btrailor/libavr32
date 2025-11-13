@@ -75,6 +75,7 @@
 
 
 #include "uhi_ftdi.h"
+#include "uhi_cdc.h"
 #include "uhi_hid.h"
 #include "uhi_midi.h"
 //#include "ui.h"
