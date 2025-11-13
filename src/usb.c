@@ -33,10 +33,12 @@ void usb_vbus_error(void) {
 
 // usb connection callback
 void usb_connection(uhc_device_t *dev, bool b_present) {
-    // print_dbg("\r\n usb device connection: ");
-    // print_dbg_hex(dev);
-    // print_dbg(" , ");
-    // print_dbg_ulong(b_present);
+    print_dbg("\r\n USB: device connection, present=");
+    print_dbg_ulong(b_present);
+    if (dev) {
+        print_dbg(" dev=0x");
+        print_dbg_hex((u32)dev);
+    }
 }
 
 // usb wakeup callback
@@ -51,9 +53,10 @@ void usb_sof(void) {
 
 // usb end-of-enumeration callback
 void usb_enum(uhc_device_t *dev, uhc_enum_status_t status) {
-  // print_dbg("\r\n usb enumerated: ");
-  // print_dbg_hex(dev);
-  // print_dbg(" , ");
-  // print_dbg_hex(status);
-
+  print_dbg("\r\n USB: enumeration complete, status=");
+  print_dbg_hex(status);
+  if (dev) {
+      print_dbg(" dev=0x");
+      print_dbg_hex((u32)dev);
+  }
 }
