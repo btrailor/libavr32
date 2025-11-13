@@ -269,10 +269,14 @@ u8 check_monome_device_desc(char* mstr, char* pstr, char* sstr) {
   // Detect and set the appropriate transport
   eMonomeTransport detectedTransport = detect_transport();
   set_transport(detectedTransport);
-  //-- source strings are unicode so we need to look at every other byte
+  
+  //-- FTDI strings are unicode (UTF-16) so we need to look at every other byte
+  //-- CDC strings are plain ASCII, so we copy them directly
+  u8 isUnicode = (detectedTransport == eTransportFTDI);
+  
   // manufacturer
   for(i=0; i<MONOME_MANSTR_LEN; i++) {
-    buf[i] = mstr[i*2];
+    buf[i] = isUnicode ? mstr[i*2] : mstr[i];
   }
   buf[i] = 0;
   matchMan = ( strncmp(buf, "monome", MONOME_MANSTR_LEN) == 0 );
@@ -283,7 +287,7 @@ u8 check_monome_device_desc(char* mstr, char* pstr, char* sstr) {
 
   // serial number string
   for(i=0; i<MONOME_SERSTR_LEN; i++) {
-    buf[i] = sstr[i*2];
+    buf[i] = isUnicode ? sstr[i*2] : sstr[i];
   }
   buf[i] = 0;
   print_dbg("\r\n check_monome: processed serial string: ");
