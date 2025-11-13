@@ -630,7 +630,7 @@ static u8 setup_mext(void) {
   u8 w = 0;
   u8 busy;
 
-  // print_dbg("\r\n setup mext device");
+  print_dbg("\r\n setup_mext: querying extended protocol device");
   mdesc.protocol = eProtocolMext;
 
   mdesc.vari = 1;
@@ -652,6 +652,7 @@ static u8 setup_mext(void) {
 
   rxBytes = 0;
 
+  print_dbg("\r\n setup_mext: sending query byte, waiting for 6-byte response");
   while(rxBytes != 6 && transport->connected()) {
     // FIXME: fuck these delays
     transport->write(&w, 1);	// query
@@ -666,6 +667,10 @@ static u8 setup_mext(void) {
       busy = transport->rx_busy();
 
     rxBytes = transport->rx_bytes();
+
+    print_dbg("\r\n setup_mext: got ");
+    print_dbg_ulong(rxBytes);
+    print_dbg(" bytes");
 
     if(rxBytes != 6 ){
       print_dbg("e");
