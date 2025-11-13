@@ -120,9 +120,11 @@ uhc_enum_status_t uhi_cdc_install(uhc_device_t* dev) {
       if ((ptr_iface->bInterfaceClass == CDC_CLASS_COMM) &&
           (ptr_iface->bInterfaceSubClass == CDC_SUBCLASS_ACM)) {
         print_dbg("\r\n CDC: found communication interface");
+        b_iface_comm_supported = true;
         b_iface_supported = true;
       } else if (ptr_iface->bInterfaceClass == CDC_CLASS_DATA) {
         print_dbg("\r\n CDC: found data interface");
+        b_iface_data_supported = true;
         b_iface_supported = true;
       } else {
         b_iface_supported = false;
