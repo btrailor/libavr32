@@ -150,6 +150,8 @@ static monome_transport_t cdc_transport = {
 static void setup_40h(u8 cols, u8 rows);
 static void setup_series(u8 cols, u8 rows);
 static u8 setup_mext(void);
+static inline void set_funcs(void);
+static inline void monome_connect_write_event(void);
 
 // rx for each protocol
 static void read_serial_40h(void);
@@ -306,35 +308,47 @@ u8 check_monome_device_desc(char* mstr, char* pstr, char* sstr) {
       // not a monome
       return 0;
     }
-  } else { // matched manufctrr string
-    if(buf[0] != 'm') {
-      // not a monome, somehow. shouldn't happen
-      return 0;
+  } else { // matched manufacturer string
+    // Check for old-style serial patterns (m40h, m64-, m128-, m256-)
+    if(buf[0] == 'm') {
+      if(buf[3] == 'h') {
+        // this is a 40h
+        print_dbg("\r\n detected 40h grid");
+        setup_40h(8, 8);
+        return 1;
+      }
+      if( strncmp(buf, "m64-", 4) == 0 ) {
+        // series 64
+        print_dbg("\r\n detected series 64 grid");
+        setup_series(8, 8);
+        return 1;
+      }
+      if( strncmp(buf, "m128-", 5) == 0 ) {
+        // series 128
+        print_dbg("\r\n detected series 128 grid");
+        setup_series(16, 8);
+        return 1;
+      }
+      if( strncmp(buf, "m256-", 5) == 0 ) {
+        // series 256
+        print_dbg("\r\n detected series 256 grid");
+        setup_series(16, 16);
+        return 1;
+      }
     }
-    if(buf[3] == 'h') {
-      // this is a 40h
-      setup_40h(8, 8);
-      return 1;
-    }
-    if( strncmp(buf, "m64-", 4) == 0 ) {
-      // series 64
-      setup_series(8, 8);
-      return 1;
-    }
-    if( strncmp(buf, "m128-", 5) == 0 ) {
-      // series 128
-      setup_series(16, 8);
-      return 1;
-    }
-    if( strncmp(buf, "m256-", 5) == 0 ) {
-      // series 256
-      setup_series(16, 16);
-      return 1;
-    }
-    // if we got here, serial number didn't match series or 40h patterns.
-    // so this is probably an extended-protocol device.
-    // we need to query for device attributes
-    return setup_mext();
+    // Modern CDC grids have non-'m' serials like "cdc001"
+    // Skip the extended protocol query which causes issues
+    // Just assume 128 grid (16x8) - most common modern size
+    print_dbg("\r\n detected modern grid, assuming 128 (16x8)");
+    mdesc.protocol = eProtocolMext;
+    mdesc.device = eDeviceGrid;
+    mdesc.rows = 8;
+    mdesc.cols = 16;
+    mdesc.vari = 1;
+    mdesc.tilt = 1;
+    set_funcs();
+    monome_connect_write_event();
+    return 1;
   }
   return 0;
 }
