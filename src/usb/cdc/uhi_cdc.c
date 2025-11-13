@@ -79,18 +79,19 @@ static void ctl_req_end(
 
 //----- external (UHC) functions
 uhc_enum_status_t uhi_cdc_install(uhc_device_t* dev) {
+  bool b_iface_supported;
   bool b_iface_comm_supported = false;
   bool b_iface_data_supported = false;
-  uint16_t conf_desc_lgt, vid, pid;
+  uint16_t conf_desc_lgt;
   usb_iface_desc_t *ptr_iface;
+  uint16_t vid, pid;
 
-  print_dbg("\r\n run uhi_cdc_install");
+  print_dbg("\r\n CDC: uhi_cdc_install() called");
 
   if (uhi_cdc_dev.dev != NULL) {
     return UHC_ENUM_SOFTWARE_LIMIT; // Device already allocated
   }
 
-  // check vid/pid - for monome we accept any CDC device
   vid = le16_to_cpu(dev->dev_desc.idVendor);
   pid = le16_to_cpu(dev->dev_desc.idProduct);
 
@@ -118,14 +119,13 @@ uhc_enum_status_t uhi_cdc_install(uhc_device_t* dev) {
     case USB_DT_INTERFACE:
       if ((ptr_iface->bInterfaceClass == CDC_CLASS_COMM) &&
           (ptr_iface->bInterfaceSubClass == CDC_SUBCLASS_ACM)) {
-        print_dbg("\r\n found CDC communication interface");
-        b_iface_comm_supported = true;
+        print_dbg("\r\n CDC: found communication interface");
+        b_iface_supported = true;
       } else if (ptr_iface->bInterfaceClass == CDC_CLASS_DATA) {
-        print_dbg("\r\n found CDC data interface");
-        b_iface_data_supported = true;
+        print_dbg("\r\n CDC: found data interface");
+        b_iface_supported = true;
       } else {
-        b_iface_comm_supported = false;
-        b_iface_data_supported = false;
+        b_iface_supported = false;
       }
       break;
 
