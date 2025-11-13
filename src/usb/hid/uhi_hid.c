@@ -90,13 +90,6 @@ uhc_enum_status_t uhi_hid_install(uhc_device_t* dev) {
   if (uhi_hid_dev.dev != NULL) {
     return UHC_ENUM_SOFTWARE_LIMIT; // Device already allocated
   }
-
-  // Reject monome devices - they should be handled by CDC driver
-  vid = le16_to_cpu(dev->dev_desc.idVendor);
-  if(vid == 0x16c0 || vid == 0x0483) {
-    print_dbg("\r\n HID: rejecting monome VID, deferring to CDC driver");
-    return UHC_ENUM_UNSUPPORTED;
-  }
   conf_desc_lgt = le16_to_cpu(dev->conf_desc->wTotalLength);
   ptr_iface = (usb_iface_desc_t*)dev->conf_desc;
   b_iface_supported = false;
