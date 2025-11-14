@@ -74,6 +74,7 @@ void cdc_write(u8* data, u32 bytes) {
 }
 
 void cdc_read(void) {
+  print_dbg("\r\n cdc_read() called");
   if (rxBusy == false) {
     rxBytes = 0;
     rxBusy = true;

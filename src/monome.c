@@ -581,14 +581,18 @@ static inline void set_funcs(void) {
 // set transport functions
 static void set_transport(eMonomeTransport transport_type) {
   currentTransport = transport_type;
+  print_dbg("\r\n set_transport: setting transport to ");
   switch(transport_type) {
     case eTransportFTDI:
+      print_dbg("FTDI");
       transport = &ftdi_transport;
       break;
     case eTransportCDC:
+      print_dbg("CDC");
       transport = &cdc_transport;
       break;
     default:
+      print_dbg("DEFAULT (FTDI)");
       transport = &ftdi_transport; // fallback to FTDI
       currentTransport = eTransportFTDI;
       break;
