@@ -50,6 +50,10 @@ typedef enum {
   kEventTrNormal,
   kEventKey,
   
+  // cdc / serial connect events (for aleph)
+  kEventSerialConnect,
+  kEventSerialDisconnect,
+  
   // aleph-specific
   kEventAdc0 , 	// receive values from polled ADC channels
   kEventAdc1 ,
