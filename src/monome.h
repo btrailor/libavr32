@@ -120,6 +120,8 @@ extern void init_monome(void);
 extern u8 check_monome_device_desc(char* mstr, char* pstr, char* sstr);
 // setup mext direct (for cdc)
 extern void monome_setup_mext(void);
+// query grid size via mext protocol (non-blocking)
+extern u8 monome_query_mext_size(void);
 
 // check dirty flags and refresh leds
 extern void monome_grid_refresh(void);

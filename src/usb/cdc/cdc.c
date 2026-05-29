@@ -78,9 +78,20 @@ static void cdc_tx_done(usb_add_t add,
 void cdc_write(u8* data, u32 bytes) {
   if (txBusy == false) {
     txBusy = true;
-    // CDC port 0, blocking buffer write via UHI
-    if (!uhi_cdc_write_buf(0, data, bytes)) {
-      print_dbg("\r\n cdc tx write error");
+    // UHI CDC write returns bytes remaining; 0 means all written
+    iram_size_t remaining = uhi_cdc_write_buf(0, data, bytes);
+    if (remaining == bytes) {
+      // nothing was written
+      print_dbg("\r\n cdc tx write error: 0 bytes written");
+      txBusy = false;
+    } else {
+      print_dbg("\r\n cdc_write: ");
+      print_dbg_ulong(bytes);
+      print_dbg(" bytes, remaining=");
+      print_dbg_ulong(remaining);
+      // data queued, will be sent by UHI
+      // For now, clear immediately since UHI write_buf is synchronous
+      // TODO: make this properly async with callback
       txBusy = false;
     }
   }
@@ -95,10 +106,18 @@ void cdc_read(void) {
     rxBytes = 0;
     rxBusy = true;
     // request CDC bulk IN transfer into rxBuf
-    if (!uhi_cdc_read_buf(0, rxBuf, CDC_RX_BUF_SIZE)) {
-      print_dbg("\r\n cdc rx read error");
-      rxBusy = false;
+    // uhi_cdc_read_buf() may block waiting for data,
+    // so only read what is already available.
+    iram_size_t nb = uhi_cdc_get_nb_received(0);
+    print_dbg("\r\n cdc_read: nb_received=");
+    print_dbg_ulong(nb);
+    if (nb) {
+      iram_size_t remaining = uhi_cdc_read_buf(0, rxBuf, CDC_RX_BUF_SIZE);
+      rxBytes = CDC_RX_BUF_SIZE - remaining;
+      print_dbg(" bytes read=");
+      print_dbg_ulong(rxBytes);
     }
+    rxBusy = false;
   }
 }
 
@@ -130,6 +149,8 @@ void cdc_change(uhc_device_t* dev, u8 plug) {
 
 // setup new device connection (called from main loop)
 void cdc_setup(void) {
+  print_dbg("\r\n cdc_setup: opening CDC port");
+
   // open CDC port 0 with default 115200 8N1 config
   usb_cdc_line_coding_t conf = {
     .dwDTERate   = 115200,
@@ -144,6 +165,11 @@ void cdc_setup(void) {
   }
 
   cdcConnect = 1;
+  print_dbg("\r\n cdc_setup: port open, calling monome_setup_mext");
+
+  // set up monome function pointers for CDC transport
+  // but don't block waiting for grid size response
+  monome_setup_mext();
 }
 
 void cdc_disconnect(void) {

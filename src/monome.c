@@ -958,11 +958,11 @@ static void set_intense_mext(u8 v) {
 }
 
 // setup mext direct (for cdc)
+// this is called after CDC port is opened, but without blocking for response
 void monome_setup_mext() {
-	u8 w;
-	u8 *prx;
+	print_dbg("\r\n monome_setup_mext: setting CDC function pointers");
 
-	// set rxtx funcs
+	// set rxtx funcs to CDC functions
 	serial_read = &cdc_read;
 	serial_write = &cdc_write;
 	tx_busy = &cdc_tx_busy;
@@ -971,36 +971,80 @@ void monome_setup_mext() {
 	rx_bytes = &cdc_rx_bytes;
 	serial_connected = &cdc_connected;
 
+	// clear rx state
 	rxBytes = 0;
 
-	w = 5; // size request
-	serial_write(&w, 1);
-	delay_us(500);
-	serial_read();
-
-	// sane defaults
+	// use sane defaults for modern grid (128)
+	// actual size will be determined when grid responds to queries
 	mdesc.device = eDeviceGrid;
 	mdesc.rows = 8;
 	mdesc.cols = 16;
+	mdesc.protocol = eProtocolMext;
+	mdesc.vari = 1;
+
+	print_dbg("\r\n monome_setup_mext: posting connect event, cols=");
+	print_dbg_ulong(mdesc.cols);
+	print_dbg(" rows=");
+	print_dbg_ulong(mdesc.rows);
+
+	set_funcs();
+	monome_connect_write_event();
+}
+
+// query grid size via mext protocol
+// should be called after monome_setup_mext() when grid is expected to respond
+// returns 1 if size was determined, 0 if not (call again later)
+u8 monome_query_mext_size(void) {
+	u8 w;
+	u8 *prx;
+	u8 busy;
+
+	// if no CDC device connected, bail
+	if (!cdc_connected()) {
+		return 0;
+	}
+
+	// send size query
+	w = 5;
+	serial_write(&w, 1);
+
+	// small delay for device to respond
+	delay_us(500);
+
+	// non-blocking read
+	serial_read();
+
+	// check if we got data
+	busy = 1;
+	u8 timeout = 100; // ~100 x 10us = 1ms max wait
+	while (busy && timeout--) {
+		busy = rx_busy();
+		delay_us(10);
+	}
+
+	if (busy) {
+		// transfer still pending, no data yet
+		return 0;
+	}
+
+	rxBytes = rx_bytes();
+	if (rxBytes == 0) {
+		return 0;
+	}
 
 	prx = rx_buf();
-	print_dbg("\r\nreceived: ");
-	print_dbg_ulong(*prx);
-	if(*prx == 3) { // SIZE
+	if (*prx == 3) { // SIZE response
 		prx++;
 		mdesc.cols = *prx;
 		prx++;
 		mdesc.rows = *prx;
+		if (mdesc.cols == 0) {
+			mdesc.device = eDeviceArc;
+		}
+		return 1;
 	}
 
-	if(mdesc.cols == 0) // it's actually an arc
-		mdesc.device = eDeviceArc;
-
-	mdesc.protocol = eProtocolMext;
-	mdesc.vari = 1;
-
-	set_funcs();
-	monome_connect_write_event();
+	return 0;
 }
 
 
