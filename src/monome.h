@@ -117,6 +117,9 @@ extern void monome_check_transport(void);
 // check dirty flags and refresh leds
 extern void monome_grid_refresh(void);
 
+// non-blocking read dispatcher (CDC or FTDI)
+extern void monome_transport_read(void);
+
 // check dirty flags and refresh leds
 extern void monome_arc_refresh(void);
 
@@ -135,6 +138,9 @@ extern void monome_connect_parse_event_data(u32 data, eMonomeDevice * dev, u8* w
 // disconnect
 // (no data needed, so no parse)
 //extern void monome_disconnect_parse_event_data(u32 data, u8* x, u8* y, u8* val);
+
+// setup monome with CDC transport (non-blocking, uses default size)
+extern void monome_setup_mext(void);
 
 // grid presses
 // parameters: column, row, on/off value
@@ -159,9 +165,9 @@ extern void monome_ring_key_parse_event_data(u32 data, u8* n, u8* val);
   there's no great speed difference so use whichever suits the situation.
  */
 // grid led/set function
-extern void monome_led_set(u8 x, u8 y, u8 val);
+extern void monome_grid_led_set(u8 x, u8 y, u8 val);
 // grid led/toggle function
-extern void monome_led_toggle(u8 x, u8 y);
+extern void monome_grid_led_toggle(u8 x, u8 y);
 // arc led/set function
 extern void monome_arc_led_set(u8 enc, u8 ring, u8 val);
 

@@ -87,7 +87,7 @@ void ftdi_write(u8* data, u32 bytes) {
 }
 
 void ftdi_read(void) {
-  print_dbg("\r\n ftdi_read() called");
+//  print_dbg("\r\n ftdi_read() called");
   if (rxBusy == false) {
     rxBytes = 0;
     rxBusy = true;

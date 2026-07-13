@@ -14,6 +14,7 @@
 #include "cdc.h"
 #include "monome.h"
 #include "uhi_cdc.h"
+#include "usb_protocol_cdc.h"
 
 //---- defines
 
@@ -26,6 +27,7 @@ static u32 rxBytes = 0;
 static u8 rxBusy = 0;
 static u8 txBusy = 0;
 static event_t e;
+static u8 cdcPlugged = 0;
 
 //------- static functions
 
@@ -35,18 +37,13 @@ static void cdc_rx_done(usb_add_t add,
                         iram_size_t nb) {
   rxBytes = nb;
 
-  if (stat != UHD_TRANS_NOERROR) {
-    print_dbg("\r\n cdc rx transfer callback error. status: 0x");
-    print_dbg_hex((u32)stat);
-    print_dbg(" ; bytes transferred: ");
-    print_dbg_ulong(nb);
-  }
-
-  if (rxBytes) {
+  // FIXME: if the buffer is full, it's a false receive
+  if (rxBytes > 0 && rxBytes < CDC_RX_BUF_SIZE) {
     // check for monome events
     (*monome_read_serial)();
   }
 
+  rxBytes = 0;
   rxBusy = false;
 }
 
@@ -74,7 +71,7 @@ void cdc_write(u8* data, u32 bytes) {
 }
 
 void cdc_read(void) {
-  print_dbg("\r\n cdc_read() called");
+  // print_dbg("\r\n cdc_read() called");
   if (rxBusy == false) {
     rxBytes = 0;
     rxBusy = true;
@@ -88,11 +85,21 @@ void cdc_read(void) {
 // respond to connection or disconnection of cdc device.
 // may be called from an interrupt
 void cdc_change(uhc_device_t* dev, u8 plug) {
+  print_dbg("\r\n cdc_change: plug=");
+  print_dbg_hex(plug);
+  // guard against duplicate events from interrupt flooding
+  static u8 lastPlug = 0xff;
+  if(plug == lastPlug) {
+    return;  // already in this state, ignore duplicate
+  }
+  lastPlug = plug;
+  
   if(plug) {
-    e.type = kEventCdcConnect;
+    cdcPlugged = 1;
+    e.type = kEventSerialConnect;
   } else {
     cdcConnect = 0;
-    e.type = kEventCdcDisconnect;
+    e.type = kEventSerialDisconnect;
   }
   // posting an event so the main loop can respond
   event_post(&e);
@@ -106,23 +113,39 @@ void cdc_setup(void) {
   u8 result;
   
   print_dbg("\r\n CDC setup routine");
+
+  // open CDC port 0 with default 115200 8N1 config
+  usb_cdc_line_coding_t conf = {
+    .dwDTERate   = 115200,
+    .bCharFormat = CDC_STOP_BITS_1,
+    .bParityType = CDC_PAR_NONE,
+    .bDataBits   = 8
+  };
+
+  if (!uhi_cdc_open(0, &conf)) {
+    print_dbg("\r\n CDC setup: failed to open port");
+    return;
+  }
+
   // set connection flag
   cdcConnect = 1;
 
   // get string data...
   uhi_cdc_get_strings(&manstr, &prodstr, &serstr);
   
-  print_dbg("\r\n CDC strings: man=");
-  print_dbg(manstr);
-  print_dbg(" prod=");
-  print_dbg(prodstr);
-  print_dbg(" ser=");
-  print_dbg(serstr);
-  
-  //// query if this is a monome device
+  // query if this is a monome device
   result = check_monome_device_desc(manstr, prodstr, serstr);
-  print_dbg("\r\n CDC device check result: ");
-  print_dbg_hex(result);
+
+  if(result) {
+    print_dbg("\r\n CDC setup: monome device detected");
+    monome_setup_mext();
+  }
+}
+
+// disconnect
+void cdc_disconnect(void) {
+  uhi_cdc_close(0);
+  cdcConnect = 0;
 }
 
 // rx buffer
@@ -142,6 +165,11 @@ extern volatile u8 cdc_rx_busy() {
 
 extern volatile u8 cdc_tx_busy() {
   return txBusy;
+}
+
+// boot-time plug state accessor
+extern u8 cdc_was_plugged(void) {
+  return cdcPlugged;
 }
 
 // device connected flag

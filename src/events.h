@@ -19,8 +19,8 @@ typedef enum {
   kEventFtdiConnect,
   kEventFtdiDisconnect,
   /// connect/disconnect CDC-based devices
-  kEventCdcConnect,
-  kEventCdcDisconnect,
+  kEventSerialConnect,
+  kEventSerialDisconnect,
   /// monome protocol
   kEventMonomeConnect,
   kEventMonomeDisconnect,
@@ -88,8 +88,12 @@ typedef struct {
 // global array of pointers to handlers
 extern void (*app_event_handlers[])(s32 data);
 
-// init event queue
+// init event queue and fill handler table with safe no-ops
 void init_events( void );
+
+// flush the event queue only (does NOT reset handler table)
+void events_flush( void );
+
 
 // check the queue for pending events
 // return 1 if found

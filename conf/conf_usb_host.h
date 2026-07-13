@@ -13,7 +13,7 @@
 
 //! Array of UHI APIs Define the list of UHI supported by USB host.
 // #define USB_HOST_UHI        UHI_FTDI , UHI_HID
-#define USB_HOST_UHI        UHI_FTDI, UHI_CDC, UHI_HID, UHI_MSC, UHI_MIDI
+#define USB_HOST_UHI        UHI_CDC, UHI_HID, UHI_FTDI, UHI_MIDI
 
 //! Maximum current allowed on Vbus (mA)
 #define USB_HOST_POWER_MAX  500
@@ -62,25 +62,24 @@
 /* #define UHI_HID_MOUSE_EVENT_BTN_MIDDLE(b_state)  hid_mouse_btn_middle(b_state) */
 /* #define UHI_HID_MOUSE_EVENT_MOUVE(x,y,scroll)    hid_mouse_move(x,y,scroll) */
 
-// generic HID functions
-#define UHI_HID_CHANGE(dev,b_plug) hid_change(dev, b_plug)
+// cdc functions
+#define UHI_CDC_CHANGE(dev, b_plug) cdc_change(dev, b_plug)
 
 // ftdi functions
-// #define UHI_FTDI_CHANGE(dev, b_plug) ftdi_change(dev, b_plug)
+#define UHI_FTDI_CHANGE(dev, b_plug) ftdi_change(dev, b_plug)
 
 // midi functions
-// #define UHI_MIDI_CHANGE(dev, b_plug) midi_change(dev, b_plug)
+#define UHI_MIDI_CHANGE(dev, b_plug) midi_change(dev, b_plug)
 
-#define UHI_MSC_CHANGE(dev,b_plug) msc_change(dev, b_plug)
+// hid functions
+#define UHI_HID_CHANGE(dev, b_plug) hid_change(dev, b_plug)
 
 
-#include "uhi_ftdi.h"
 #include "uhi_cdc.h"
+#include "uhi_ftdi.h"
 #include "uhi_hid.h"
 #include "uhi_midi.h"
 //#include "ui.h"
 #include "usb.h"
-#include "uhi_msc.h"
-#include "msc.h"
 
 #endif // _CONF_USB_HOST_H_
