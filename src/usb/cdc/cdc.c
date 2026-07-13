@@ -144,6 +144,11 @@ extern volatile u8 cdc_tx_busy() {
   return txBusy;
 }
 
+// device disconnect
+extern void cdc_disconnect(void) {
+  cdcConnect = 0;
+}
+
 // device connected flag
 extern u8 cdc_connected(void) {
   return cdcConnect;
